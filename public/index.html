@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Masters Pool 2026</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="header-title">
+      <div class="logo">⛳</div>
+      <h1>
+        <span>2026 Masters Tournament</span>
+        Pinehurst Golf Pool
+      </h1>
+    </div>
+    <nav class="header-nav">
+      <a href="admin.html">Admin →</a>
+    </nav>
+  </div>
+</header>
+
+<div class="status-bar" id="statusBar">
+  <span class="spinner"></span> Loading leaderboard…
+</div>
+
+<main>
+  <div class="card">
+    <div class="card-header">Pool Standings</div>
+    <div id="standingsContainer">
+      <div class="empty-state">
+        <div class="icon">⛳</div>
+        <p>Loading standings…</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Scoring Rules</div>
+    <div style="padding:16px 20px; font-family:Arial,sans-serif; font-size:0.9rem; color:var(--gray-700); line-height:1.7;">
+      <ul style="padding-left:20px;">
+        <li>Each team consists of <strong>4 golfers</strong>.</li>
+        <li>Each round, the <strong>single best (lowest) score</strong> from your 4 golfers counts for your team.</li>
+        <li>If a golfer misses the cut or withdraws, your team competes with fewer players — giving your remaining golfers no room for a bad day.</li>
+        <li>Lowest cumulative total after all rounds wins the pool.</li>
+      </ul>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Scores sourced from ESPN / Masters.com &nbsp;·&nbsp;
+  <a href="admin.html">Admin</a> &nbsp;·&nbsp;
+  Auto-refreshes every 60 seconds
+</footer>
+
+<!-- Team detail modal -->
+<div class="modal-backdrop" id="teamModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Team Detail</h2>
+      <button class="modal-close" id="modalClose">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+let currentStandings = [];
+let refreshTimer = null;
+
+// ---- Utilities ----
+function scoreClass(toParStr) {
+  if (!toParStr || toParStr === '-') return '';
+  if (toParStr === 'E' || toParStr === '0') return 'score-even';
+  return toParStr.startsWith('-') ? 'score-under' : 'score-over';
+}
+
+// rounds[i] are already to-par integers from the server
+function roundToPar(val) {
+  if (val == null) return null;
+  if (val === 0) return 'E';
+  return val > 0 ? `+${val}` : String(val);
+}
+
+// ---- Render standings ----
+function renderStandings(data) {
+  const { standings, lastUpdated, source, playerCount } = data;
+
+  // Update status bar
+  const bar = document.getElementById('statusBar');
+  if (lastUpdated) {
+    const dt = new Date(lastUpdated);
+    const timeStr = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    bar.innerHTML = playerCount > 0
+      ? `Live data via <span class="source">${source || 'ESPN'}</span> &nbsp;·&nbsp; ${playerCount} golfers &nbsp;·&nbsp; Last updated ${timeStr} &nbsp;·&nbsp; Auto-refreshes in <span id="countdown">60</span>s`
+      : `No live tournament data yet &nbsp;·&nbsp; Standings will appear when the Masters begins &nbsp;·&nbsp; Refreshing in <span id="countdown">60</span>s`;
+  }
+
+  const container = document.getElementById('standingsContainer');
+
+  if (!standings || standings.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">⛳</div>
+        <p>No teams entered yet. <a href="admin.html">Add teams in the admin page →</a></p>
+      </div>`;
+    return;
+  }
+
+  const hasScores = standings.some(s => s.roundsPlayed > 0);
+
+  let html = `<table class="standings-table">
+    <thead>
+      <tr>
+        <th style="width:44px">Pos</th>
+        <th>Team</th>`;
+
+  if (hasScores) {
+    html += `
+        <th class="num" title="Best score from team each round">R1</th>
+        <th class="num">R2</th>
+        <th class="num">R3</th>
+        <th class="num">R4</th>
+        <th class="num">Total</th>`;
+  }
+  html += `</tr></thead><tbody>`;
+
+  standings.forEach((team, i) => {
+    const posLabel = team.position === '-' ? '-' : (i > 0 && team.totalStrokes === standings[i-1].totalStrokes ? 'T' + team.position : team.position);
+    const posClass = team.position <= 3 ? 'pos-cell top' : 'pos-cell';
+
+    const golferTagsHtml = team.golfers.map(g => {
+      let cls = 'golfer-tag';
+      if (g.status === 'CUT') cls += ' cut';
+      else if (g.status === 'WD') cls += ' wd';
+      const statusNote = g.status === 'CUT' ? ' (CUT)' : g.status === 'WD' ? ' (WD)' : (!g.found && g.status !== 'ACTIVE' ? ' (?)' : '');
+      return `<span class="${cls}">${escHtml(g.name)}${statusNote}</span>`;
+    }).join('');
+
+    let roundCells = '';
+    if (hasScores) {
+      for (let r = 0; r < 4; r++) {
+        const rb = team.roundBests[r];
+        if (rb) {
+          const parLabel = roundToPar(rb.score);
+          const cls = scoreClass(parLabel) + ' round-score';
+          roundCells += `<td><div class="${cls}" title="Best: ${escHtml(rb.contributor)}">${parLabel}</div></td>`;
+        } else {
+          roundCells += `<td><div class="round-score empty">—</div></td>`;
+        }
+      }
+      roundCells += `<td class="score-cell ${scoreClass(team.toParLabel)}">${team.toParLabel}</td>`;
+    }
+
+    html += `
+      <tr data-team-idx="${i}" style="cursor:pointer">
+        <td><div class="${posClass}">${posLabel}</div></td>
+        <td>
+          <div class="owner-name">${escHtml(team.ownerName)}</div>
+          <div class="golfers-compact">${golferTagsHtml}</div>
+        </td>
+        ${roundCells}
+      </tr>`;
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+
+  // Row click → open modal
+  container.querySelectorAll('tr[data-team-idx]').forEach(row => {
+    row.addEventListener('click', () => {
+      const idx = parseInt(row.dataset.teamIdx);
+      openTeamModal(standings[idx]);
+    });
+  });
+}
+
+// ---- Team detail modal ----
+function openTeamModal(team) {
+  document.getElementById('modalTitle').textContent = team.ownerName + "'s Team";
+  const body = document.getElementById('modalBody');
+
+  // Summary score
+  const scoreHtml = team.roundsPlayed > 0
+    ? `<p style="font-family:Arial,sans-serif;font-size:0.9rem;color:var(--gray-500);margin-bottom:16px;">
+         Team Total: <strong class="${scoreClass(team.toParLabel)}" style="font-size:1.1rem;">${team.toParLabel}</strong>
+         &nbsp;through ${team.roundsPlayed} round${team.roundsPlayed > 1 ? 's' : ''}
+       </p>`
+    : `<p style="font-family:Arial,sans-serif;font-size:0.85rem;color:var(--gray-500);margin-bottom:16px;">Tournament has not started.</p>`;
+
+  // Golfer table
+  let tableHtml = `<table class="golfer-detail-table">
+    <thead>
+      <tr>
+        <th>Golfer</th>
+        <th>Pos</th>
+        <th class="mono">R1</th>
+        <th class="mono">R2</th>
+        <th class="mono">R3</th>
+        <th class="mono">R4</th>
+        <th>Total</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  team.golfers.forEach((g, gi) => {
+    const roundCells = [0,1,2,3].map(ri => {
+      const stroke = g.rounds[ri];
+      const isBest = team.roundBests[ri] && team.roundBests[ri].contributor === g.name && stroke != null;
+      const label  = stroke != null ? roundToPar(stroke) : '—';
+      const cls    = isBest ? 'score-cell ' + scoreClass(label) : (stroke == null ? 'empty' : '');
+      const badge  = isBest ? '<span class="contributor-badge">Best</span>' : '';
+      return `<td class="mono ${cls}">${label}${badge}</td>`;
+    }).join('');
+
+    const statusBadge = g.status === 'CUT' ? '<span style="color:var(--gray-500);font-size:0.8rem;">CUT</span>'
+                      : g.status === 'WD'  ? '<span style="color:var(--red);font-size:0.8rem;">WD</span>'
+                      : !g.found           ? '<span style="color:orange;font-size:0.8rem;">Not found</span>'
+                      : '<span style="color:var(--green);font-size:0.8rem;">Active</span>';
+
+    tableHtml += `<tr>
+      <td style="font-weight:bold">${escHtml(g.name)}</td>
+      <td style="font-family:Arial,sans-serif">${g.position}</td>
+      ${roundCells}
+      <td class="mono ${scoreClass(g.toParStr)}">${g.toParStr || '—'}</td>
+      <td>${statusBadge}</td>
+    </tr>`;
+  });
+
+  // Best-round summary row
+  const bestRow = [0,1,2,3].map(ri => {
+    const rb = team.roundBests[ri];
+    if (!rb) return '<td class="mono empty">—</td>';
+    const lbl = roundToPar(rb.score);
+    return `<td class="mono score-cell ${scoreClass(lbl)}" title="${escHtml(rb.contributor)}">${lbl}</td>`;
+  }).join('');
+
+  tableHtml += `<tr style="background:var(--green-light);font-weight:bold">
+    <td colspan="2" style="font-family:Arial,sans-serif;font-size:0.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--green-dark)">Team Best Each Round</td>
+    ${bestRow}
+    <td class="mono score-cell ${scoreClass(team.toParLabel)}">${team.toParLabel}</td>
+    <td></td>
+  </tr>`;
+
+  tableHtml += '</tbody></table>';
+
+  body.innerHTML = scoreHtml + tableHtml;
+  document.getElementById('teamModal').classList.add('open');
+}
+
+document.getElementById('modalClose').addEventListener('click', () => {
+  document.getElementById('teamModal').classList.remove('open');
+});
+document.getElementById('teamModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('teamModal')) {
+    document.getElementById('teamModal').classList.remove('open');
+  }
+});
+
+// ---- Data fetching ----
+async function loadStandings() {
+  try {
+    const res = await fetch('/api/standings');
+    const data = await res.json();
+    currentStandings = data.standings || [];
+    renderStandings(data);
+  } catch (err) {
+    document.getElementById('statusBar').textContent = 'Error loading data — will retry shortly.';
+  }
+  startCountdown();
+}
+
+function startCountdown() {
+  let secs = 60;
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    secs--;
+    const el = document.getElementById('countdown');
+    if (el) el.textContent = secs;
+    if (secs <= 0) {
+      clearInterval(refreshTimer);
+      loadStandings();
+    }
+  }, 1000);
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+loadStandings();
+</script>
+</body>
+</html>

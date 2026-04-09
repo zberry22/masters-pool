@@ -72,6 +72,10 @@
           <label>Golfer 4</label>
           <input type="text" id="golfer4" list="golferList" placeholder="Type to search…">
         </div>
+        <div class="form-group">
+          <label>Golfer 5</label>
+          <input type="text" id="golfer5" list="golferList" placeholder="Type to search…">
+        </div>
       </div>
       <datalist id="golferList"></datalist>
       <div id="golferWarning" style="font-family:Arial,sans-serif;font-size:0.82rem;color:orange;margin-bottom:12px;display:none"></div>
@@ -173,6 +177,7 @@ function renderTeams() {
         <th>Golfer 2</th>
         <th>Golfer 3</th>
         <th>Golfer 4</th>
+        <th>Golfer 5</th>
         <th></th>
       </tr>
     </thead>
@@ -185,6 +190,7 @@ function renderTeams() {
       <td>${escHtml(t.golfer2)}</td>
       <td>${escHtml(t.golfer3)}</td>
       <td>${escHtml(t.golfer4)}</td>
+      <td>${escHtml(t.golfer5)}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-secondary" onclick="editTeam(${t.id})">Edit</button>
         &nbsp;
@@ -200,7 +206,7 @@ function renderTeams() {
 // ---- Validate golfer names against leaderboard ----
 function warnUnknownGolfers() {
   if (allGolfers.length === 0) return; // can't validate before leaderboard loads
-  const inputs = ['golfer1','golfer2','golfer3','golfer4'];
+  const inputs = ['golfer1','golfer2','golfer3','golfer4','golfer5'];
   const unknown = inputs
     .map(id => document.getElementById(id).value.trim())
     .filter(n => n && !allGolfers.some(g => g.toLowerCase() === n.toLowerCase()));
@@ -213,7 +219,7 @@ function warnUnknownGolfers() {
   }
 }
 
-['golfer1','golfer2','golfer3','golfer4'].forEach(id => {
+['golfer1','golfer2','golfer3','golfer4','golfer5'].forEach(id => {
   document.getElementById(id).addEventListener('change', warnUnknownGolfers);
 });
 
@@ -225,21 +231,22 @@ async function saveTeam() {
   const golfer2   = document.getElementById('golfer2').value.trim();
   const golfer3   = document.getElementById('golfer3').value.trim();
   const golfer4   = document.getElementById('golfer4').value.trim();
+  const golfer5   = document.getElementById('golfer5').value.trim();
 
-  if (!ownerName || !golfer1 || !golfer2 || !golfer3 || !golfer4) {
+  if (!ownerName || !golfer1 || !golfer2 || !golfer3 || !golfer4 || !golfer5) {
     showAlert('All fields are required.', 'error');
     return;
   }
 
   // Check for duplicate golfer selection
-  const picks = [golfer1, golfer2, golfer3, golfer4];
+  const picks = [golfer1, golfer2, golfer3, golfer4, golfer5];
   const unique = new Set(picks.map(p => p.toLowerCase()));
-  if (unique.size < 4) {
+  if (unique.size < 5) {
     showAlert('Each golfer must be unique — you have a duplicate.', 'error');
     return;
   }
 
-  const body = { owner_name: ownerName, golfer1, golfer2, golfer3, golfer4 };
+  const body = { owner_name: ownerName, golfer1, golfer2, golfer3, golfer4, golfer5 };
   const url    = id ? `/api/teams/${id}` : '/api/teams';
   const method = id ? 'PUT' : 'POST';
 
@@ -272,6 +279,7 @@ function editTeam(id) {
   document.getElementById('golfer2').value   = t.golfer2;
   document.getElementById('golfer3').value   = t.golfer3;
   document.getElementById('golfer4').value   = t.golfer4;
+  document.getElementById('golfer5').value   = t.golfer5;
   document.getElementById('formCardHeader').textContent = 'Edit Team — ' + t.owner_name;
   document.getElementById('cancelEditBtn').style.display = '';
   document.getElementById('formCard').scrollIntoView({ behavior: 'smooth' });
@@ -288,6 +296,7 @@ function clearForm() {
   document.getElementById('golfer2').value   = '';
   document.getElementById('golfer3').value   = '';
   document.getElementById('golfer4').value   = '';
+  document.getElementById('golfer5').value   = '';
   document.getElementById('formCardHeader').textContent = 'Add New Team';
   document.getElementById('cancelEditBtn').style.display = 'none';
   document.getElementById('golferWarning').style.display = 'none';

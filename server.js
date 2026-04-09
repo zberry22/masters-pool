@@ -213,7 +213,7 @@ function calculateStandings(teams, players) {
   }
 
   const results = teams.map(team => {
-    const golferNames = [team.golfer1, team.golfer2, team.golfer3, team.golfer4];
+    const golferNames = [team.golfer1, team.golfer2, team.golfer3, team.golfer4, team.golfer5];
     const golferData  = golferNames.map(n => findPlayer(n, playerMap));
 
     // For each of the 4 rounds, take the best (lowest) score from any golfer
@@ -326,8 +326,8 @@ app.get('/api/teams', (req, res) => {
 
 // Admin: add team
 app.post('/api/teams', requireAdmin, (req, res) => {
-  const { owner_name, golfer1, golfer2, golfer3, golfer4 } = req.body;
-  if (!owner_name || !golfer1 || !golfer2 || !golfer3 || !golfer4) {
+  const { owner_name, golfer1, golfer2, golfer3, golfer4, golfer5 } = req.body;
+  if (!owner_name || !golfer1 || !golfer2 || !golfer3 || !golfer4 || !golfer5) {
     return res.status(400).json({ error: 'All fields are required.' });
   }
   const db = readDB();
@@ -340,6 +340,7 @@ app.post('/api/teams', requireAdmin, (req, res) => {
     golfer2: golfer2.trim(),
     golfer3: golfer3.trim(),
     golfer4: golfer4.trim(),
+    golfer5: golfer5.trim(),
     created_at: new Date().toISOString(),
   };
   db.teams.push(team);
@@ -349,12 +350,12 @@ app.post('/api/teams', requireAdmin, (req, res) => {
 
 // Admin: edit team
 app.put('/api/teams/:id', requireAdmin, (req, res) => {
-  const { owner_name, golfer1, golfer2, golfer3, golfer4 } = req.body;
+  const { owner_name, golfer1, golfer2, golfer3, golfer4, golfer5 } = req.body;
   const id = parseInt(req.params.id);
   const db = readDB();
   const idx = db.teams.findIndex(t => t.id === id);
   if (idx === -1) return res.status(404).json({ error: 'Team not found.' });
-  db.teams[idx] = { ...db.teams[idx], owner_name: owner_name.trim(), golfer1: golfer1.trim(), golfer2: golfer2.trim(), golfer3: golfer3.trim(), golfer4: golfer4.trim() };
+  db.teams[idx] = { ...db.teams[idx], owner_name: owner_name.trim(), golfer1: golfer1.trim(), golfer2: golfer2.trim(), golfer3: golfer3.trim(), golfer4: golfer4.trim(), golfer5: golfer5.trim() };
   writeDB(db);
   res.json({ success: true });
 });

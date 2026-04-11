@@ -220,6 +220,7 @@ function calculateStandings(teams, players) {
     const roundBests = [0, 1, 2, 3].map(ri => {
       const scores = golferData
         .filter(Boolean)
+        .filter(g => g.status === 'ACTIVE')
         .map(g => g.rounds[ri])
         .filter(s => s !== null && s !== undefined);
       if (scores.length === 0) return null;

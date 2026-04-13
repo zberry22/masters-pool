@@ -121,6 +121,8 @@ function parseESPN(data) {
       // linescores[i].value is raw strokes for completed rounds but partial
       // accumulated strokes for in-progress — so we never use .value.
       const rounds = linescores.map(ls => {
+        // If ESPN has no value, the round was not played — ignore displayValue entirely
+        if (ls.value == null) return null;
         const dv = ls.displayValue;
         if (!dv || dv === '--' || dv === '') return null;
         return parseToPar(dv);
@@ -220,7 +222,6 @@ function calculateStandings(teams, players) {
     const roundBests = [0, 1, 2, 3].map(ri => {
       const scores = golferData
         .filter(Boolean)
-        .filter(g => g.status === 'ACTIVE')
         .map(g => g.rounds[ri])
         .filter(s => s !== null && s !== undefined);
       if (scores.length === 0) return null;
